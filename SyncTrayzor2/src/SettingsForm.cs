@@ -44,7 +44,7 @@ namespace SyncTrayzor2
             Size = new Size(820, 660);
             MinimumSize = new Size(760, 600);
             StartPosition = FormStartPosition.CenterScreen;
-            Icon = TrayIconFactory.Get(TrayState.Idle);
+            Icon = TrayIconFactory.App;
             Font = new Font("Microsoft YaHei UI", 9f);
 
             _priority.Items.AddRange(new object[] { "Normal", "BelowNormal", "AboveNormal", "High", "Idle" });

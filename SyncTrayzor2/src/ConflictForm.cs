@@ -107,7 +107,7 @@ namespace SyncTrayzor2
             Text = "冲突文件 - SyncTrayzor2";
             Size = new Size(900, 560);
             StartPosition = FormStartPosition.CenterScreen;
-            Icon = TrayIconFactory.Get(TrayState.Error);
+            Icon = TrayIconFactory.App;
             Font = new Font("Microsoft YaHei UI", 9f);
 
             _list = new ListView

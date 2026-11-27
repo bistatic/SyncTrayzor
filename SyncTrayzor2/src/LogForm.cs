@@ -15,7 +15,7 @@ namespace SyncTrayzor2
             Text = "日志 - SyncTrayzor2";
             Size = new Size(1000, 640);
             StartPosition = FormStartPosition.CenterScreen;
-            Icon = TrayIconFactory.Get(TrayState.Idle);
+            Icon = TrayIconFactory.App;
             Font = new Font("Consolas", 9f);
 
             _text = new TextBox

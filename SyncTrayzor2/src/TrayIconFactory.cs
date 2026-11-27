@@ -18,6 +18,26 @@ namespace SyncTrayzor2
     /// <summary>动态绘制托盘图标：底色表示状态，白色双向箭头表示同步，同步中整体旋转。</summary>
     internal static class TrayIconFactory
     {
+        private static Icon _appIcon;
+
+        /// <summary>程序官方图标（原版 SyncTrayzor 图标，从 exe 内嵌资源读取），用于各窗体。</summary>
+        public static Icon App
+        {
+            get
+            {
+                if (_appIcon != null) return _appIcon;
+                try
+                {
+                    var exe = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                    _appIcon = System.Drawing.Icon.ExtractAssociatedIcon(exe);
+                }
+                catch
+                {
+                    _appIcon = Get(TrayState.Idle);
+                }
+                return _appIcon;
+            }
+        }
         private static readonly Dictionary<string, Icon> Cache = new();
         private const int Frames = 8;
 

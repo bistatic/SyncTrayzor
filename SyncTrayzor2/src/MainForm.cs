@@ -30,7 +30,7 @@ namespace SyncTrayzor2
             StartPosition = FormStartPosition.CenterScreen;
             Size = new Size(1120, 760);
             MinimumSize = new Size(720, 480);
-            Icon = TrayIconFactory.Get(TrayState.Idle);
+            Icon = TrayIconFactory.App;
 
             _toolStrip = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden, ImageScalingSize = new Size(16, 16) };
 
