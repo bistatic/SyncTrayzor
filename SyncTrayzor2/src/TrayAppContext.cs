@@ -100,10 +100,13 @@ namespace SyncTrayzor2
             {
                 _externalInstance = true;
                 _apiReachable = true;
+                HideMainWindowWait();
                 Log.Info("检测到已在运行的 Syncthing，直接连接: " + _api.BaseUrl);
             }
             else if (_cfg.StartSyncthingAutomatically)
             {
+                // 未找到运行实例：先盖遮罩再走启动/下载流程
+                ShowMainWindowWait("正在准备 Syncthing…", "未查询到正在运行的 Syncthing 实例，正在查找并启动主程序…");
                 await StartSyncthingAsync().ConfigureAwait(true);
             }
 
@@ -147,9 +150,19 @@ namespace SyncTrayzor2
                         && error.Contains("未找到 syncthing.exe")
                         && _cfg.AutoDownloadSyncthing)
                     {
-                        if (!await TryAutoDownloadAsync().ConfigureAwait(true)) return false;
+                        ShowMainWindowWait("未找到 Syncthing 主程序",
+                            "未查询到正在运行的 Syncthing 实例，且安装目录中没有 syncthing.exe。\n\n正在从官方 GitHub 下载最新版本，完成后将自动启动…");
+
+                        if (!await TryAutoDownloadAsync().ConfigureAwait(true))
+                        {
+                            HideMainWindowWait();
+                            return false;
+                        }
+
+                        ShowMainWindowWait("正在启动 Syncthing…", "下载完成，正在启动 Syncthing 进程…");
                         if (!_proc.Start(_cfg, out error))
                         {
+                            HideMainWindowWait();
                             if (!string.IsNullOrEmpty(error))
                             {
                                 SetState(TrayState.Error, error);
@@ -167,7 +180,8 @@ namespace SyncTrayzor2
 
                             if (error.Contains("未找到 syncthing.exe"))
                             {
-                                ShowMainWindow();
+                                ShowMainWindowWait("未找到 Syncthing 主程序",
+                                    "未查询到正在运行的 Syncthing 实例，且没有可用的 syncthing.exe。\n\n请在设置中指定 Syncthing 路径，或开启自动下载。点击关闭此页面后，\n可从托盘图标菜单打开设置。");
                                 ShowSettings();
                             }
                         }
@@ -209,6 +223,7 @@ namespace SyncTrayzor2
                 if (await _api.IsAliveAsync().ConfigureAwait(true))
                 {
                     _apiReachable = true;
+                    HideMainWindowWait();
                     break;
                 }
             }
@@ -225,8 +240,9 @@ namespace SyncTrayzor2
                 var progress = new Progress<(long received, long total)>(v =>
                 {
                     var totalMb = v.total > 0 ? (v.total / 1048576.0) : 0;
-                    SetState(TrayState.Offline,
-                        "正在下载 Syncthing… " + (v.received / 1048576.0).ToString("0.0") + " / " + totalMb.ToString("0.0") + " MB");
+                    var text = "正在下载 Syncthing… " + (v.received / 1048576.0).ToString("0.0") + " / " + totalMb.ToString("0.0") + " MB";
+                    SetState(TrayState.Offline, text);
+                    UpdateMainWindowWait("正在下载 Syncthing 最新版", text + "\n\n下载完成后将自动校验并启动 Syncthing。", false);
                 });
 
                 Log.Info("开始自动下载 Syncthing（官方最新版）");
@@ -240,6 +256,9 @@ namespace SyncTrayzor2
             {
                 Log.Error("自动下载 Syncthing 失败", ex);
                 SetState(TrayState.Error, "Syncthing 下载失败，请手动放置 syncthing.exe");
+                UpdateMainWindowWait("下载 Syncthing 失败",
+                    "无法下载：" + ex.Message +
+                    "\n\n请从 github.com/syncthing/syncthing/releases 手动下载 syncthing.exe，\n放到本程序 data 目录后，从托盘菜单选择“重启 Syncthing”。", false);
                 Notify("下载失败",
                     "无法下载 Syncthing：" + ex.Message + "\n\n请从 github.com/syncthing/syncthing/releases 手动下载 syncthing.exe 放到程序 data 目录。",
                     ToolTipIcon.Error);
@@ -659,12 +678,37 @@ namespace SyncTrayzor2
             {
                 _mainForm = new MainForm(this);
                 _mainForm.FormClosed += (s, e) => _mainForm = null;
+                // 新建窗口时若 API 未就绪，立即盖上等待遮罩
+                if (!_apiReachable)
+                    _mainForm.ShowWait("正在准备 Syncthing…", "未查询到正在运行的 Syncthing 实例，正在连接/启动…");
             }
             _mainForm.Show();
             if (_mainForm.WindowState == FormWindowState.Minimized)
                 _mainForm.WindowState = FormWindowState.Normal;
             _mainForm.Activate();
             _mainForm.BringToFront();
+        }
+
+        /// <summary>显示主窗口（隐藏到托盘的情况下则唤出）并盖上等待遮罩。</summary>
+        private void ShowMainWindowWait(string title, string detail)
+        {
+            ShowMainWindow();
+            _mainForm?.ShowWait(title, detail);
+        }
+
+        /// <summary>更新遮罩文字（窗口未创建时忽略）。</summary>
+        private void UpdateMainWindowWait(string title, string detail, bool bringFront)
+        {
+            if (_mainForm == null || _mainForm.IsDisposed) return;
+            if (bringFront) ShowMainWindow();
+            _mainForm.ShowWait(title, detail);
+        }
+
+        /// <summary>API 就绪后撤掉遮罩；若窗口可见则加载界面。</summary>
+        private void HideMainWindowWait()
+        {
+            if (_mainForm == null || _mainForm.IsDisposed) return;
+            _mainForm.HideWait(true);
         }
 
         private void ShowSettings()

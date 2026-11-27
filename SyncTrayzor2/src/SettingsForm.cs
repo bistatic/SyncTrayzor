@@ -3,7 +3,6 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
-
 namespace SyncTrayzor2
 {
     internal sealed class SettingsForm : Form
@@ -79,6 +78,23 @@ namespace SyncTrayzor2
             LoadFrom(cfg);
         }
 
+        /// <summary>由候选路径推出文件对话框的初始目录：优先目录本身，其次文件所在目录，均无效则回退桌面。</summary>
+        private static string ResolveInitialDir(string candidate)
+        {
+            if (!string.IsNullOrWhiteSpace(candidate))
+            {
+                try
+                {
+                    var trimmed = candidate.Trim().Trim('"');
+                    if (Directory.Exists(trimmed)) return trimmed;
+                    var dir = Path.GetDirectoryName(trimmed);
+                    if (Directory.Exists(dir)) return dir;
+                }
+                catch { }
+            }
+            return Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        }
+
         private TabPage BuildGeneralTab()
         {
             var page = new TabPage("常规") { Padding = new Padding(4) };
@@ -105,7 +121,9 @@ namespace SyncTrayzor2
                 using var dlg = new OpenFileDialog
                 {
                     Filter = "Syncthing (syncthing.exe)|syncthing.exe|可执行文件 (*.exe)|*.exe",
-                    Title = "选择 syncthing.exe"
+                    Title = "选择 syncthing.exe",
+                    InitialDirectory = ResolveInitialDir(
+                        !string.IsNullOrWhiteSpace(_syncthingPath.Text) ? _syncthingPath.Text : _effExe)
                 };
                 if (dlg.ShowDialog(this) == DialogResult.OK) _syncthingPath.Text = dlg.FileName;
             };
@@ -114,7 +132,13 @@ namespace SyncTrayzor2
             var browseHome = new Button { Text = "浏览…", Width = 80, Height = 26 };
             browseHome.Click += (s, e) =>
             {
-                using var dlg = new FolderBrowserDialog { Description = "选择 Syncthing 配置与数据目录" };
+                using var dlg = new FolderBrowserDialog
+                {
+                    Description = "选择 Syncthing 配置与数据目录",
+                    SelectedPath = !string.IsNullOrWhiteSpace(_homePath.Text) ? _homePath.Text.Trim()
+                        : (!string.IsNullOrWhiteSpace(_effHome) ? _effHome
+                            : Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData))
+                };
                 if (dlg.ShowDialog(this) == DialogResult.OK) _homePath.Text = dlg.SelectedPath;
             };
             AddRow(layout, "配置/数据目录", WithButton(_homePath, browseHome));

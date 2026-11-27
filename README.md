@@ -1,226 +1,113 @@
+# SyncTrayzor2
 
-SyncTrayzor [![Build status](https://ci.appveyor.com/api/projects/status/pwa4mpy4066okxyu?svg=true)](https://ci.appveyor.com/project/canton7/synctrayzor)
-===========
+下一代 [Syncthing](https://syncthing.net/) Windows 托盘程序 — 完整支持 **Syncthing 2.x**，保留原版 [SyncTrayzor](https://github.com/canton7/SyncTrayzor) 全部核心功能。
 
-⚠️ SyncTrayzor is unmaintained ⚠️
----------------------------
+> 原版 SyncTrayzor 1.1.29（2021 年）使用 Syncthing 1.x 的单横线参数语法（`-no-browser`）。当 Syncthing 自动升级到 2.x 后，参数解析器更换为双横线语法（`--no-browser`），导致托盘启动失败并反复报错：
+>
+> ```
+> syncthing.exe: error: unknown flag -n, did you mean one of "-h", "-C", "-D", "-H"?
+> ```
+>
+> SyncTrayzor2 通过**版本自适应参数引擎**彻底解决该问题。
 
-I stopped using Syncthing some years ago, and I'm afraid I don't have the time to maintain it. Sorry.
+## 2.0 版本核心特点
 
-GermanCoding has kindly forked it as [SyncTrayzor v2](https://github.com/GermanCoding/SyncTrayzor) and is continuing development, and this fork is [recommended by Syncthing](https://docs.syncthing.net/users/contrib.html#windows).
-Please switch to SyncTrayzor v2 (after determining that you trust the fork!).
+### 🔄 1.x / 2.x 版本自适应（核心）
 
-Quick Links
------------
+启动前先探测 Syncthing 版本，再按对应语法生成命令行，一套程序同时兼容两代 Syncthing：
 
- - [Download and install SyncTrayzor now](#installation)
- - [Something went wrong](#something-went-wrong)
- - [Find Syncthing/SyncTrayzor useful? Please donate!](DONATING.md#donating)
+| Syncthing 版本 | 生成的启动参数 |
+|---|---|
+| **2.x** | `serve --no-browser --no-console --no-restart --no-upgrade --home=... --gui-address=...` |
+| **1.x** | `-no-browser -no-console -no-restart -no-upgrade -home=... -gui-address=...` |
 
+额外兜底：设置中误填单横线长参数（`-no-browser`）时自动修正为 `--no-browser`；默认禁止 Syncthing 自动升级，避免再次触发版本兼容问题。
 
-Introduction
-------------
+### ⬇️ 自动下载 Syncthing
 
-SyncTrayzor is a little tray utility for [Syncthing](https://syncthing.net/) on Windows.
-It hosts and wraps Syncthing, making it behave more like a native Windows application and less like a command-line utility with a web browser interface.
+系统中找不到 syncthing.exe 时，自动从官方 GitHub Release 下载最新版到本地：
 
-Features include:
+- 三级下载源回退：镜像加速 → API 资产端点 → 官方直连（单源 5 分钟超时自动切换）
+- **SHA256 校验**（比对官方 `digest` 字段），不一致即丢弃，防篡改/传输损坏
+- 原子替换就位（`.new` → 正式文件，旧版保留 `.old` 备份）
+- 托盘气泡 + 实时进度（"正在下载 Syncthing… x/13.6 MB"）
+- 也可在托盘菜单手动触发"下载最新版 Syncthing…"
 
- - Has a built-in web browser, so you don't need to fire up an external browser.
- - Optionally starts on login, so you don't need to set up Syncthing as a service.
- - Has drop-box style file download / progress window
- - Tray icon indicates when synchronization is occurring.
- - Alerts you when:
-    - You have file conflicts
-    - One of your folders is out of sync
-    - Folders finish syncing
-    - Devices connect / disconnect
- - Has a tool to help you resolve file conflicts
- - Can pause devices on metered networks, to stop Syncthing transferring data on e.g. a mobile connection or wifi hotspot.
- - Contains translations for many languages
+### 🖥️ 现代化界面
 
+- **WebView2 内置浏览器**（替代原版 CEF/Chromium Embedded）——随系统更新，无需捆绑上百 MB 的浏览器内核
+- 自动带 API Key 登录 Syncthing 网页界面，主窗口打开即用
+- 三行 TableLayoutPanel 固定布局，彻底避免原版工具栏遮挡网页内容的问题
+- 状态栏常驻显示当前 Syncthing 版本与实际数据目录
 
-![Screenshot](readme/screenshot.png)
+### 📊 状态感知托盘
 
-Installation
-------------
+- 动态绘制托盘图标：空闲（蓝）/ 同步中（绿，旋转动画）/ 暂停（灰）/ 错误（红）
+- 托盘菜单逐文件夹显示同步状态与剩余字节
+- 悬停即可查看当前使用的 syncthing.exe 完整路径与数据目录
+- 设备连接/断开、同步完成、错误、冲突文件气泡通知
 
-SyncTrayzor is packaged as both an installer, standalone zip, and chocolatey package. It will run on Windows Vista or newer.
+### 🛠️ 其他保留与增强的功能
 
-### Installer
+- Syncthing 子进程全生命周期管理：优雅停止（REST shutdown → 等待 → 兜底 Kill）、异常退出自动重启（1 分钟 4 次限流防风暴）
+- 冲突文件扫描（`*.sync-conflict-*`）：定位到文件、移入回收站（非永久删除）
+- 三标签页设置（常规 / Syncthing / 高级）：路径自动探测、进程优先级、GUI 地址、额外参数、API Key 只读显示、"实际使用"路径透明化
+- 单实例互斥（二次启动自动唤出已有窗口）
+- 登录自启（HKCU Run）、关闭到托盘、启动最小化
+- 日志体系：程序日志 + Syncthing 输出分文件，内存环形缓冲 + 内置实时日志窗口
 
-[Download `SyncTrayzorSetup-x64.exe` or `SyncTrayzorSetup-x86.exe`](https://github.com/canton7/SyncTrayzor/releases/latest) and run it.
-If you already have SyncTrayzor installed, this will update it.
+## 与原版 SyncTrayzor 的差异
 
-### Standalone
+| 功能 | 原版 1.1.29 | SyncTrayzor2 |
+|---|---|---|
+| Syncthing 2.x 支持 | ❌（报 unknown flag -n） | ✅ 版本自适应 |
+| 内置浏览器 | CEF（捆绑 150+ MB） | WebView2（系统自带） |
+| 自动下载 Syncthing | ❌ 仅自动升级 | ✅ 官方源 + SHA256 校验 |
+| 传输进度小窗/速率曲线 | ✅ | ❌（可在 Syncthing 网页查看） |
+| 自动更新自身 | ✅ 私有服务器 | ❌（可从 Release 手动更新） |
+| 冲突文件处理 | 扫描+对比工具 | 定位 / 回收站删除 |
+| .NET 运行时 | .NET Framework 4.7.2 | .NET 8 Desktop Runtime |
 
-First, you'll need .net 4.7.2. [Download the offline](https://support.microsoft.com/en-gb/help/4054530/microsoft-net-framework-4-7-2-offline-installer-for-windows) or [web installer](https://support.microsoft.com/en-gb/help/4054531/microsoft-net-framework-4-7-2-web-installer-for-windows) if you don't have it installed already.
+## 安装
 
-[Download `SyncTrayzorPortable-x64.zip` or `SyncTrayzorPortable-x86.zip`](https://github.com/canton7/SyncTrayzor/releases/latest).
-Unzip, and run `SyncTrayzor.exe`. If you're updating, you'll need to copy the `data` folder across from your previous standalone installation.
+### 前置要求
 
+- Windows 10 1809+ / Windows 11
+- [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)（Win11 及多数 Win10 已预装）
 
-### Chocolatey
+### 使用
 
-The installed version of SyncTrayzor is also [available on Chocolatey](https://chocolatey.org/packages/synctrayzor).
+1. 下载并解压 `SyncTrayzor2-x64.zip` 到任意可写目录
+2. 运行 `SyncTrayzor2.exe`
+3. **无需手动准备 syncthing.exe** —— 首次运行会自动下载官方最新版到 `data\` 目录
+4. 如需沿用已有 Syncthing 设备/文件夹配置：设置 → Syncthing → "配置/数据目录" 填原 Syncthing home 路径（如 `%LOCALAPPDATA%\Syncthing`）
 
+### 从原版 SyncTrayzor 迁移
+
+| 原版形态 | 迁移动作 |
+|---|---|
+| 便携版 | 配置目录填 `SyncTrayzorPortable\data\syncthing`，设备/文件夹/API Key 自动沿用 |
+| 安装版 | 配置目录填 `%LOCALAPPDATA%\Syncthing` |
+| 手动迁移 | 复制原版 `data\config.xml` 中的 `<apikey>` 亦可 |
+
+## 构建
+
+```powershell
+dotnet publish SyncTrayzor2.csproj -c Release -o dist
 ```
-C:\> choco install synctrayzor
-```
 
-Something went wrong!
----------------------
+Release 配置已启用：确定性构建、路径脱敏（`PathMap`）、关闭 PDB，发布产物不含构建机本地路径。
 
-First, what went wrong? Remember that SyncTrayzor is a wrapper around [Syncthing](https://github.com/syncthing/syncthing).
-Syncthing is the file synchronization program, which has a web interface.
-SyncTrayzor is the tray utility, looks like a normal Windows program, and has menus and suchlike, and a big area where Syncthing's web interface is displayed.
+## 技术栈
 
- - If you're having problems connecting to other devices, your files aren't synchronizing, or you're getting error messages in the console area, [raise an issue with Syncthing](https://github.com/syncthing/syncthing/issues/new) or [post on the Syncthing forums](https://forum.syncthing.net).
- - If SyncTrayzor isn't talking to Syncthing, you're getting error dialogs, it's not auto-starting, etc, [raise an issue with SyncTrayzor](https://github.com/canton7/SyncTrayzor/issues/new).
- - If you're not sure, raise an issue here and I'll redirect you if appropriate.
+- C# / .NET 8 / WinForms
+- [Microsoft.Web.WebView2](https://www.nuget.org/packages/Microsoft.Web.WebView2)（内置浏览器）
+- System.Net.Http.Json / System.Text.Json（REST 客户端，零第三方依赖）
+- GDI+ 动态托盘图标
 
+## 许可证
 
-Contributing
-------------
+遵循上游 [SyncTrayzor](https://github.com/canton7/SyncTrayzor) 的开源许可（MIT）。
 
-Multi-lingual? SyncTrayzor needs you! Please read [Localization](https://github.com/canton7/SyncTrayzor/wiki/Localization).
-
-Want to make a contribution? Fantastic, and thank you! Please read [Contributing](https://github.com/canton7/SyncTrayzor/wiki/Contributing) first.
-
-
-Find Syncthing/SyncTrayzor useful? Please donate!
--------------------------------------------------
-
-Please see [DONATING](DONATING.md#donating).
-
-
-Will SyncTrayzor phone home / give away my secrets / etc?
----------------------------------------------------------
-
-SyncTrayzor's auto-update mechanism will periodically call a script (found in `server/version_check.php`, hosted on a server of mine) to find out if there's an upgrade available.
-It will disclose your current SyncTrayzor version, and the package you downloaded (installer/portable and x64/x86).
-It will also reveal your IP address, which is unavoidable.
-
-You can turn off auto-updates in the Settings, but in that case you are responsible for manually checking for updates.
-
-Usage information, details of your computer / network / syncthing setup / etc are not reported.
-
-
-How can I be sure that I'm not downloading a virus?
----------------------------------------------------
-
-You can be paranoid and build everything from source (after auditing the source), or you can trust that I'm a good person who's trusted by the Syncthing developers.
-
-You can verify that this GitHub account hasn't been compromised and is releasing malicious downloads by following the steps in the [Security README](https://github.com/canton7/SyncTrayzor/tree/master/security).
-This process also lets you verify that Syncthing's developers trust me to release non-malicious software.
-
-
-What will SyncTrayzor do to Syncthing?
---------------------------------------
-
-It's worth noting that SyncTrayzor will override the 'GUI Listen Address' and 'API Key' in Syncthing's configuration.
-This is because it needs to fully control these values, in order to ensure that it can communicate with Syncthing.
-
-However, you can set these values in File -> Settings, if you want to customise them.
-
-
-What will SyncTrayzor do to my system?
---------------------------------------
-
-Good question. The answer depends on whether you installed SyncTrayzor using the installer, or are running it standalone.
-
-### Installed
-
-The Installed version of SyncTrayzor will install itself into `C:\Program Files\SyncTrayzor` or `C:\Program Files (x86)\SyncTrayzor` for the 64-bit and 32-bit version respectively.
-
-By default, SyncTrayzor will put its own configuration in `C:\Users\<You>\AppData\Roaming\SyncTrayzor`, and let Syncthing use its default folder for its database, which is `C:\Users\<You>\AppData\Local\Syncthing`.
-It will also create a registry key at `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run\SyncTrayzor` the first time that it is run, which will let it start when you log in.
-
-You can delete this registry key by unchecking "Automatically start on login" in the settings.
-
-You can set a custom home path for Syncthing in the settings if you wish (Settings -> Syncthing -> Advanced -> Syncthing Custom Home Path).
-This is useful if you want to keep the copy of Syncthing managed by SyncTrayzor separate from another copy running on your machine.
-
-The auto-update mechanism may download updates to `%TEMP%\SyncTrayzor`.
-This location is periodically cleared out.
-
-### Portable
-
-SyncTrayzor Portable will put its own configuration in `SyncTrayzorPortable\data`, and tell Syncthing to use `SyncTrayzorPortable\data\syncthing` for its database.
-This means that, when manually upgrading, you can simply move the 'data' folder over to move all your settings and database.
-
-The portable version won't start on login by default. If you check "Automatically start on login" in the settings, then a registry key will be created at `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run\SyncTrayzor`.
-
-The auto-update mechanism may download updates to `%TEMP%\SyncTrayzor`.
-This location is periodically cleared out.
-
-
-Migrating between "raw" Syncthing, Portable, and Installed SyncTrayzor
-----------------------------------------------------------------------
-
-
-Here's a handy table of what you need to copy where if you're migrating between different combinations of "raw" Syncthing, SyncTrayzor Installed, and SyncTrayzor Portable.
-
-| From | To | Actions |
-| --- | --- | --- |
-| "raw" Syncthing | SyncTrayzor Installed | None | 
-| "raw" Syncthing | SyncTrayzor Portable | Copy the contents of `C:\Users\<You>\AppData\Local\Syncthing` into the `data\syncthing` folder inside the portable directory |
-| SyncTrayzor Installed | "raw" Syncthing | None |
-| SyncTrayzor Installed | SyncTrayzor Portable | <ol><li>Copy the contents of `C:\Users\<You>\AppData\Local\Syncthing` into the `data\syncthing` folder inside the portable directory</li><li>Copy `C:\Users\<You>\AppData\Roaming\SyncTrayzor\config.xml` to `data\config.xml`</li></ol> |
-| SyncTrayzor Portable | "raw" Syncthing | Copy the contents of the `data\syncthing\` folder inside the portable directly into `C:\Users\<You>\AppData\Local\Syncthing` |
-| SyncTrayzor Portable | SyncTrayzor Installed | <ol><li>Copy the contents of the `data\syncthing` folder inside the portable directory into `C:\Users\<You>\AppData\Local\Syncthing`</li><li>Copy `data\config.xml` to `C:\Users\<You>\AppData\Roaming\SyncTrayzor\config.xml`</li></ol> |
-
-
-Backups
--------
-
-For the installed version of SyncTrayzor, in order to save your configuration (both Syncthing's and SyncTrayzor's), you will need to backup the following paths:
-
- - `C:\Users\<You>\AppData\Roaming\SyncTrayzor`
- - `C:\Users\<You>\AppData\Local\Syncthing`
-
-
-Using Syncthing beta releases
------------------------------
-
-### Installed
-
-SyncTrayzor keeps two copies of syncthing.exe.
-
-The copy that is executed is at `C:\Users\<You>\AppData\Roaming\SyncTrayzor\syncthing.exe`.
-This one is writable by the user, allowing Syncthing to auto-upgrade.
-
-There's also a backup copy in `C:\Program Files\SyncTrayzor\syncthing.exe`.
-This one is copied to `C:\Users\<You>\AppData\Roaming\SyncTrayzor\syncthing.exe` if that one does not exist (SyncTrayzor has never been run before for that user, for example).
-
-If you want to manually upgrade (e.g. to a beta version) you should download Syncthing from [the releases page](https://github.com/syncthing/syncthing/releases), and replace the `syncthing.exe` in `C:\Users\<You>\AppData\Roaming\SyncTrayzor`.
-
-
-### Portable
-
-SyncTrayzor keeps two copies of syncthing.exe.
-
-There's a copy in `data\syncthing.exe`, which is the one which is run. There's also a copy next to `SyncTrayzor.exe`, which is used if the one in `data\` is missing.
-
-If you want to manually upgrade (e.g. to a beta version) you should download Syncthing from [the releases page](https://github.com/syncthing/syncthing/releases), and replace the one at `data\syncthing.exe`.
-
-
-Building from Source
---------------------
-
-You'll need Visual Studio 2019.
-Clone/download the repository, open `src\SyncTrayzor.sln`, and compile.
-You'll also need to [download syncthing.exe](https://github.com/syncthing/syncthing/releases) and place it in the `bin\x86\Debug`, `bin\x64\Debug`, `bin\x86\Release`, or `bin\x64\Release` folder as appropriate.
-
-
-Notes for System Administrators
--------------------------------
-
-The installer is built using Inno Setup, and has various command-line options, [documented here](http://www.jrsoftware.org/ishelp/index.php?topic=setupcmdline).
-If you pass the `/silent` command-line flag when SyncTrayzor won't be launched when the installer completes: add `/StartSyncTrayzor` to override this (which also causes SyncTrayzor to be launched minimized).
-
-There are various parameters inside the file `SyncTrayzor.exe.config` which can be customised by system administrators, including the default SyncTrayzor configuration (used to create the user's SyncTrayzor config file when SyncTrayzor is first launched).
-To override these, pass the flag `/SyncTrayzorExeConfig="Path\To\Customized\SyncTrayzor.exe.config"` to the installer -- the specified `SyncTrayzor.exe.config` will overwrite the default.
-
-Note that the contents / structure of `SyncTrayzor.exe.config` may change between releases.
-Using the wrong version may cause a crash, or incorrect behaviour.
+> AI生成
