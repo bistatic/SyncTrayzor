@@ -38,6 +38,69 @@ namespace SyncTrayzor2
                 return _appIcon;
             }
         }
+
+        private static readonly Dictionary<string, Icon> StateCache = new();
+
+        /// <summary>
+        /// 托盘版图标：原版程序图标做底，仅在有事件时叠加右上角小色点
+        /// （绿=同步中闪烁、红=错误、灰=暂停），空闲/离线为纯原图标，保持原汁原味。
+        /// </summary>
+        public static Icon GetTray(TrayState state, int frame = 0)
+        {
+            var key = state + ":" + (state == TrayState.Syncing ? frame % 2 : 0);
+            lock (StateCache)
+            {
+                if (StateCache.TryGetValue(key, out var cached)) return cached;
+
+                var icon = (Icon)App.Clone();
+                if (state == TrayState.Idle || state == TrayState.Offline)
+                {
+                    StateCache[key] = icon;
+                    return icon;
+                }
+
+                // 叠加状态角标：8px 圆点 + 白描边，位于右上角
+                using var bmp = icon.ToBitmap();
+                const int size = 32;
+                using var canvas = new Bitmap(size, size);
+                using (var g = Graphics.FromImage(canvas))
+                {
+                    g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                    g.DrawImage(bmp, 0, 0, size, size);
+
+                    var dotColor = state switch
+                    {
+                        TrayState.Syncing => frame % 2 == 0 ? Color.FromArgb(0x12, 0x8C, 0x3E) : Color.FromArgb(0x1F, 0xB2, 0x57),
+                        TrayState.Error => Color.FromArgb(0xC0, 0x2B, 0x2B),
+                        TrayState.Paused => Color.FromArgb(0x8A, 0x94, 0xA6),
+                        _ => Color.Transparent
+                    };
+
+                    if (dotColor != Color.Transparent)
+                    {
+                        using var dot = new SolidBrush(dotColor);
+                        g.FillEllipse(dot, 19, 1, 12, 12);
+                        using var ring = new Pen(Color.White, 2f);
+                        g.DrawEllipse(ring, 19, 1, 12, 12);
+                    }
+                }
+
+                var hIcon = canvas.GetHicon();
+                try
+                {
+                    using var tmp = Icon.FromHandle(hIcon);
+                    icon = (Icon)tmp.Clone();
+                }
+                finally
+                {
+                    DestroyIcon(hIcon);
+                }
+
+                StateCache[key] = icon;
+                return icon;
+            }
+        }
         private static readonly Dictionary<string, Icon> Cache = new();
         private const int Frames = 8;
 

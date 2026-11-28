@@ -78,7 +78,7 @@ namespace SyncTrayzor2
             var menu = new ContextMenuStrip();
             _tray = new NotifyIcon
             {
-                Icon = TrayIconFactory.Get(TrayState.Offline),
+                Icon = TrayIconFactory.GetTray(TrayState.Offline),
                 Text = "SyncTrayzor2",
                 Visible = true,
                 ContextMenuStrip = menu
@@ -492,7 +492,7 @@ namespace SyncTrayzor2
             {
                 _state = state;
                 _frame = 0;
-                _tray.Icon = TrayIconFactory.Get(state, 0);
+                _tray.Icon = TrayIconFactory.GetTray(state, 0);
                 RebuildMenu();
             }
             _tray.Text = Truncate(tooltip, 120);
@@ -510,7 +510,7 @@ namespace SyncTrayzor2
         {
             if (_state != TrayState.Syncing) return;
             _frame = (_frame + 1) % 8;
-            _tray.Icon = TrayIconFactory.Get(TrayState.Syncing, _frame);
+            _tray.Icon = TrayIconFactory.GetTray(TrayState.Syncing, _frame);
         }
 
         // ---------------- 托盘菜单 ----------------
